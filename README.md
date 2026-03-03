@@ -125,14 +125,16 @@ CREATE TABLE co2_measurements (
 
 在 `config.h` 中可调整：
 
-| 参数                  | 默认值 | 说明                     |
-| --------------------- | ------ | ------------------------ |
-| PUMP_DUTY_MEASURE     | 120    | 测量时气泵 PWM (0-255)   |
-| PUMP_DUTY_VENT        | 150    | 通风时气泵 PWM           |
-| PUMP_TIME_MEASURE     | 25     | 测量采样时间 (秒)        |
-| PUMP_TIME_VENT        | 50     | 通风时间 (秒)            |
-| SENSOR_STABILIZE_TIME | 20     | 气压平衡等待时间 (秒)    |
-| INTERVAL_SECONDS      | 600    | 测量间隔 (秒，10分钟)    |
+| 参数                  | 默认值 | 说明                              |
+| --------------------- | ------ | --------------------------------- |
+| PUMP_DUTY_MEASURE     | 120    | 采样时气泵 PWM 力度 (0-255)       |
+| PUMP_DUTY_VENT        | 150    | 通风时气泵 PWM 力度               |
+| PUMP_TIME_MEASURE     | 25     | 采样气泵运行时间 (秒)             |
+| PUMP_TIME_VENT        | 50     | 通风气泵运行时间 (秒)             |
+| SENSOR_STABILIZE_TIME | 20     | 气压平衡等待时间 (秒)             |
+| INTERVAL_SECONDS      | 600    | 测量间隔 (固定10分钟，对齐整点)* |
+
+> *注: 修改 `INTERVAL_SECONDS` 需同步修改时间对齐逻辑，请参考源码中 `getNextAlignedEpoch()` 函数
 
 ## 项目结构
 
