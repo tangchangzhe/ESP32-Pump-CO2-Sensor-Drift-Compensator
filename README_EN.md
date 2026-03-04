@@ -1,8 +1,8 @@
-# ESP32 Closed-Loop Gas Circuit CO2 Monitoring System (Pump-Driven, with Drift Compensation)
+# ESP32 Closed-Circuit Gas Circuit CO2 Monitoring System (Pump-Driven, with Drift Compensation)
 
 [中文文档](README.md)
 
-An ESP32-based closed-loop gas circuit CO2 monitoring system (pump-driven), designed for sealed chambers (e.g., microbial culture vessels), featuring a multi-anchor drift compensation algorithm to address data drift caused by inadequate gas-tightness in low-cost setups.
+An ESP32-based closed-circuit gas circuit CO2 monitoring system (pump-driven), designed for sealed chambers (e.g., microbial culture vessels), featuring a multi-anchor drift compensation algorithm to address data drift caused by inadequate gas-tightness in low-cost setups.
 
 ## Demo
 
@@ -52,9 +52,9 @@ The system ensures accurate and uniform timestamps through a dual mechanism:
 | Multi-device Data Fusion | Inconsistent time bases across devices preclude cross-comparison analysis | Unified time reference enables direct overlay and comparison of multi-source data |
 | Data Indexing Efficiency | Scattered timestamps (`14:07:23`, `14:17:41`...) reduce retrieval and archival efficiency | Regularized timestamps (`14:00:00`, `14:10:00`...) facilitate indexing and visualization |
 
-### Closed-Loop Pump Sampling
+### Closed-Circuit Pump Sampling
 
-PWM-controlled pump for closed-loop gas circuit sampling:
+PWM-controlled pump for closed-circuit gas circuit sampling:
 
 1. Pump circulation (adjustable duration and intensity)
 2. Stop pump, wait for pressure stabilization
@@ -80,7 +80,7 @@ ESP32 Sampling → HTTP Upload → PHP Storage → ECharts Visualization
 | --------- | ----- | ----------- |
 | MCU | ESP32-S3-DevKitC-1 | Main controller |
 | CO2 Sensor | ZG09SR | NDIR infrared, Modbus RTU |
-| Air Pump | 5V Micro Pump | PWM controlled, closed-loop sampling |
+| Air Pump | 5V Micro Pump | PWM controlled, closed-circuit sampling |
 | Pump Driver | MOS Driver Module (4-pin) | PWM signal amplification |
 | Temp/Humidity | DHT22/SHT30 etc. | **Reserved interface, not yet used** |
 
