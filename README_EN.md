@@ -30,6 +30,8 @@ PWM-controlled pump for closed-loop gas circuit sampling:
 
 ### Timestamp Alignment & NTP Synchronization
 
+This mechanism trades off exact timestamp-to-sample correspondence for well-aligned timestamp sequences and reduced NTP query frequency.
+
 The system ensures accurate and uniform timestamps through a dual mechanism:
 
 1. **NTP Time Sync**: Before each measurement cycle, the ESP32 synchronizes with an NTP server to correct accumulated drift in its internal RTC clock (embedded crystal oscillators can drift by several seconds to tens of seconds per day)
@@ -47,7 +49,6 @@ The system ensures accurate and uniform timestamps through a dual mechanism:
 **Implementation Details**:
 - A single measurement takes ~45 seconds (25s pump sampling + 20s pressure stabilization), but the uploaded timestamp reflects the **scheduled time**, not the completion time
 - After each measurement, the system syncs with the NTP server and calculates the next 10-minute mark as the next sampling time; same applies after power recovery
-- This design trades off exact timestamp-to-sample correspondence for well-aligned timestamp sequences and reduced NTP query frequency
 
 ### Multi-Anchor Drift Compensation Algorithm
 
@@ -55,12 +56,8 @@ The system ensures accurate and uniform timestamps through a dual mechanism:
 
 **Solution**: A non-linear drift compensation algorithm implemented in the frontend:
 
-1. **Anchor Selection**: Users select multiple time periods where the CO2 **rate of change is stable** as calibration anchors
-   - These periods are characterized by steady-state biological activity, where CO2 changes should follow a linear trend (constant slope)
-   - **Typical anchor examples**:
-     - Pure respiration period (nighttime without light, respiration only — CO2 should rise linearly)
-     - Photosynthesis-respiration equilibrium (dynamic balance under stable illumination — CO2 should remain flat or change linearly)
-   - The difference between the **measured slope** and the **expected slope** within an anchor period represents the drift rate for that period
+1. **Anchor Selection (Cycle-Closure Method)**: Select start and end points of a complete light-dark cycle as anchors. Theoretically, after one complete cycle, CO2 should return to a similar level; the measured difference represents cumulative drift within that cycle. Essentially, gas leakage superimposes a downward trend onto the periodic biological fluctuations; the compensation algorithm levels this tilted baseline to restore the true biological signal
+   >  Note: The cycle-closure method has considerable error margin. It is only suitable for scenarios where drift trends are clearly discernible, aimed at restoring approximate periodic waveforms rather than precise quantitative analysis
 
 2. **Slope Calculation**: Linear regression on each anchor period to extract drift rate (ppm/h)
 3. **Interpolated Transition**: Linear interpolation between anchors for smooth drift rate transitions
