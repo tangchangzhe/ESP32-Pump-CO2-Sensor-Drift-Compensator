@@ -1,6 +1,6 @@
 # ESP32 闭环式 CO2 监测系统（带漂移补偿）
 
-[English Documentation](README.md)
+[English Documentation](README_EN.md)
 
 基于气泵的闭环 CO2 监测系统，适用于密封腔体（如微生物培养瓶），内置多锚点漂移补偿算法解决低成本装置的漏气问题。
 
