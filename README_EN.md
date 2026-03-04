@@ -34,21 +34,16 @@ This mechanism trades off exact timestamp-to-sample correspondence for well-alig
 
 The system ensures accurate and uniform timestamps through a dual mechanism:
 
-1. **NTP Time Sync**: Before each measurement cycle, the ESP32 synchronizes with an NTP server to correct accumulated drift in its internal RTC clock (embedded crystal oscillators can drift by several seconds to tens of seconds per day)
-2. **Grid Alignment**: All timestamps are aligned to 10-minute boundaries (`00:00:00`, `00:10:00`, `00:20:00`...), ensuring uniform data intervals
+1. **NTP Time Sync**: After each measurement (as well as on power-on or recovery from power loss), the system syncs with an NTP server and calculates the next 10-minute mark as the next sampling time, correcting accumulated RTC drift (embedded crystal oscillators can drift by several seconds to tens of seconds per day)
+2. **Grid Alignment**: Timestamps are aligned to 10-minute boundaries (`00:00:00`, `00:10:00`, `00:20:00`...). A single measurement takes ~45 seconds, but the uploaded timestamp reflects the **scheduled time**, not the completion time
 
 **Significance of Timestamp Alignment**:
 
 | Potential Issue | Impact Without Alignment | Role of Alignment Mechanism |
 | --------------- | ------------------------ | --------------------------- |
-| RTC Cumulative Drift | After a week, timestamps may drift by several minutes, causing temporal misalignment with real-world events (e.g., sunrise/sunset) | NTP calibration before each cycle ensures long-term time accuracy |
-| Non-uniform Sampling Intervals | Data point intervals fluctuate (e.g., 9m50s, 10m15s), compromising rate calculation accuracy | Strictly uniform intervals ensure reliability of mathematical analysis and interpolation |
+| RTC Cumulative Drift | After a week, timestamps may drift by several minutes, causing temporal misalignment with real-world events (e.g., sunrise/sunset) | NTP calibration after each measurement ensures long-term time accuracy |
 | Multi-device Data Fusion | Inconsistent time bases across devices preclude cross-comparison analysis | Unified time reference enables direct overlay and comparison of multi-source data |
 | Data Indexing Efficiency | Scattered timestamps (`14:07:23`, `14:17:41`...) reduce retrieval and archival efficiency | Regularized timestamps (`14:00:00`, `14:10:00`...) facilitate indexing and visualization |
-
-**Implementation Details**:
-- A single measurement takes ~45 seconds (25s pump sampling + 20s pressure stabilization), but the uploaded timestamp reflects the **scheduled time**, not the completion time
-- After each measurement, the system syncs with the NTP server and calculates the next 10-minute mark as the next sampling time; same applies after power recovery
 
 ### Multi-Anchor Drift Compensation Algorithm
 
