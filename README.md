@@ -1,200 +1,203 @@
 # ESP32 CO2 Drift Compensator
 
-基于 ESP32-S3 的气泵式闭环 CO2 检测系统，内置软件漂移补偿算法解决低成本装置的漏气问题。
+[中文文档](README_CN.md)
 
-## 效果对比
+A pump-based closed-loop CO2 monitoring system with built-in software drift compensation algorithm for low-cost sealed chamber applications.
 
-| 原始数据 (漏气导致持续下降)                | 补偿后数据 (还原真实波动)                    |
-| ------------------------------------------ | -------------------------------------------- |
-| ![原始](docs/images/before_compensation.png) | ![补偿后](docs/images/after_compensation.png) |
+## Demo
 
-## 项目特色
+| Raw Data (Leakage causes continuous decline) | Compensated Data (Restored true fluctuation) |
+| -------------------------------------------- | -------------------------------------------- |
+| ![Raw](docs/images/before_compensation.png)  | ![Compensated](docs/images/after_compensation.png) |
 
-### 气泵闭环采样
+## Features
 
-采用 PWM 控制气泵进行闭环气路采样：
+### Pump-Based Closed-Loop Sampling
 
-1. 气泵抽气循环（可调时间和力度）
-2. 关泵静置等待气压平衡
-3. 读取传感器数据
-4. 实时上传服务器
+PWM-controlled air pump for closed-loop gas circuit sampling:
 
-### 自动运行模式
+1. Pump circulation (adjustable duration and intensity)
+2. Pump off, wait for pressure stabilization
+3. Read sensor data
+4. Real-time upload to server
 
-- 开机自动启动监测，无需手动干预
-- 支持多 WiFi 热点自动切换
-- 断电恢复后自动继续
-- **时间戳对齐**：数据时间戳固定对齐到整 10 分钟 (00:00, 00:10, 00:20...)，便于漂移补偿算法的线性回归，也方便多设备数据对比
+### Auto-Start Operation
 
-### 多点锚定漂移补偿算法
+- Automatic startup on power-on, no manual intervention required
+- Multi-WiFi hotspot support with automatic switching
+- Auto-recovery after power loss
+- Timestamp alignment to 10-minute intervals
 
-针对气泵式密闭气路装置常见的漏气问题，前端实现了非线性漂移补偿。在用户选定的"稳定期"内，CO2 理论上应不变，若有线性下降则视为漏气漂移。
+### Timestamp Alignment Mechanism
 
-**核心公式：**
+The system ensures clean, aligned timestamps for data consistency:
 
-1. **单锚点漂移率**（线性回归）：
+- All data timestamps are aligned to exact 10-minute marks (`00:00`, `00:10`, `00:20`...)
+- Even though measurement takes ~45 seconds, the uploaded timestamp reflects the **scheduled time**, not completion time
+- After power recovery, the system calculates the next nearest aligned time
+- If less than 10 seconds remain until the next interval, it skips to the following one
 
-   ```
-   β = (n·Σxy - Σx·Σy) / (n·Σx² - (Σx)²)
-   ```
-   其中 x 为时间戳，y 为 CO2 读数，β 为漂移率 (ppm/ms)。
+### Multi-Point Drift Compensation Algorithm
 
-2. **多点锚定插值**（漂移率随时间变化）：
+**Problem**: Sealed gas circuits inevitably leak over time, causing CO2 readings to drift downward continuously.
 
-   ```
-   s(t) = s_k + (s_{k+1} - s_k)(t - t_k) / (t_{k+1} - t_k),  t_k ≤ t ≤ t_{k+1}
-   ```
+**Solution**: A non-linear drift compensation algorithm implemented in the frontend:
 
-3. **积分修正**：
+1. **Anchor Selection**: User selects multiple "stable periods" where CO2 should be constant (e.g., nighttime when algae respiration is steady)
+2. **Slope Calculation**: Linear regression on each anchor period yields drift rate (ppm/h)
+3. **Interpolation**: Linear interpolation between anchors for smooth drift rate transition
+4. **Cumulative Correction**: Integrate drift rate over time and subtract from raw readings
 
-   ```
-   D_i = D_{i-1} + s(t_i) · Δt
-   y_corrected = y_raw - D_i
-   ```
+**Mathematical Expression**:
 
-- 用户选择多个"稳定期"作为基准锚点，自动计算各锚点漂移率
-- 锚点间线性插值得到瞬时漂移率 s(t)
-- 按时间积分累计漂移量 D，从原始数据中扣除
+- Anchor drift rate (linear regression slope):
+  
+  $$slope = \frac{n \sum x_i y_i - \sum x_i \sum y_i}{n \sum x_i^2 - (\sum x_i)^2}$$
 
-### 完整的 IoT 数据链路
+- Corrected value (cumulative integration):
+  
+  $$CO_{2,corrected} = CO_{2,raw} - \int_0^t slope(\tau) \, d\tau$$
+
+### Complete IoT Data Pipeline
 
 ```
-ESP32 采集 → 实时HTTP上传 → PHP存储 → ECharts可视化
+ESP32 Sampling → HTTP Upload → PHP Storage → ECharts Visualization
 ```
 
-## 硬件需求
+## Hardware Requirements
 
-| 组件       | 型号               | 说明                 |
-| ---------- | ------------------ | -------------------- |
-| 主控       | ESP32-S3-DevKitC-1 | 主控制器             |
-| CO2 传感器 | ZG09SR             | NDIR红外，Modbus RTU |
-| 气泵       | 5V 微型气泵        | PWM 控制，闭环采样   |
-| 温湿度     | DHT22/SHT30 等     | **预留接口，未使用** |
+| Component | Model | Description |
+| --------- | ----- | ----------- |
+| MCU | ESP32-S3-DevKitC-1 | Main controller |
+| CO2 Sensor | ZG09SR | NDIR infrared, Modbus RTU |
+| Air Pump | 5V Micro Pump | PWM controlled, closed-loop sampling |
+| Pump Driver | MOS Module (4-pin) | PWM signal amplification |
+| Temp/Humidity | DHT22/SHT30 etc. | **Reserved interface, not used** |
 
-### 引脚连接
+### Pin Connections
 
-| ESP32 引脚 | 连接设备      |
-| ---------- | ------------- |
-| GPIO 18    | 气泵 PWM 控制 |
-| GPIO 16    | ZG09SR RX     |
-| GPIO 17    | ZG09SR TX     |
+| ESP32 Pin | Connected Device |
+| --------- | ---------------- |
+| GPIO 18 | MOS Module PWM (Pump control) |
+| GPIO 16 | ZG09SR RX |
+| GPIO 17 | ZG09SR TX |
 
-详细接线请参考 [硬件文档](docs/HARDWARE.md)
+See [Hardware Documentation](docs/HARDWARE.md) for detailed wiring.
 
-## 快速开始
+## Quick Start
 
-### 1. 固件配置
+### 1. Firmware Configuration
 
 ```bash
 cd firmware
 cp src/config.h.example src/config.h
-# 编辑 config.h 填入你的 WiFi 和服务器信息
+# Edit config.h with your WiFi and server information
 ```
 
-使用 PlatformIO 编译上传：
+Compile and upload using PlatformIO:
 
 ```bash
 pio run -t upload
 ```
 
-### 2. 服务端部署
+### 2. Server Deployment
 
 ```bash
 cd web
 cp config.php.example config.php
-# 编辑 config.php 填入数据库信息
+# Edit config.php with your database information
 ```
 
-导入示例数据（包含表结构和 1月3-9日实测数据）：
+Import sample data (includes table structure and Jan 3-9 test data):
 
 ```bash
 mysql -u your_user -p co2data < data/sample_data.sql
 ```
 
-或手动创建空表：
+Or manually create an empty table:
 
 ```sql
 CREATE TABLE co2_measurements (
   id INT AUTO_INCREMENT PRIMARY KEY,
   timestamp DATETIME NOT NULL,
   co2_ppm INT NOT NULL,
-  temperature FLOAT DEFAULT NULL,  -- 预留，当前未使用
-  humidity FLOAT DEFAULT NULL,     -- 预留，当前未使用
+  temperature FLOAT DEFAULT NULL,  -- Reserved, not used
+  humidity FLOAT DEFAULT NULL,     -- Reserved, not used
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_timestamp (timestamp)
 );
 ```
 
-### 3. 使用漂移补偿
+### 3. Using Drift Compensation
 
-1. 打开 `index.html` 网页
-2. 选择时间范围查询数据
-3. 在"漂移补偿"面板添加基准时间段（选择 CO2 应该稳定的时期）
-4. 点击"执行漂移补偿"查看效果
+1. Open `index.html` in browser
+2. Select time range to query data
+3. In "Drift Compensation" panel, add anchor time periods (select periods when CO2 should be stable)
+4. Click "Apply Drift Compensation" to see results
 
-## 串口指令
+## Serial Commands
 
-| 指令   | 功能                             |
-| ------ | -------------------------------- |
-| auto   | 恢复自动监测模式                 |
-| stop   | 暂停自动，进入手动模式           |
-| single | 单次测量 (手动模式下不上传)      |
-| vent   | 开启通风功能                     |
-| status | 查看当前状态                     |
+| Command | Function |
+| ------- | -------- |
+| auto | Resume automatic monitoring mode |
+| stop | Pause automatic, enter manual mode |
+| single | Single measurement (no upload in manual mode) |
+| vent | Start ventilation function |
+| status | View current status |
 
-## 配置参数
+## Configuration Parameters
 
-在 `config.h` 中可调整：
+Adjustable in `config.h`:
 
-| 参数                  | 默认值 | 说明                              |
-| --------------------- | ------ | --------------------------------- |
-| PUMP_DUTY_MEASURE     | 120    | 采样时气泵 PWM 力度 (0-255)       |
-| PUMP_DUTY_VENT        | 150    | 通风时气泵 PWM 力度               |
-| PUMP_TIME_MEASURE     | 25     | 采样气泵运行时间 (秒)             |
-| PUMP_TIME_VENT        | 50     | 通风气泵运行时间 (秒)             |
-| SENSOR_STABILIZE_TIME | 20     | 气压平衡等待时间 (秒)             |
-| INTERVAL_SECONDS      | 600    | 测量间隔 (固定10分钟，对齐整点)* |
+| Parameter | Default | Description |
+| --------- | ------- | ----------- |
+| PUMP_DUTY_MEASURE | 120 | Sampling pump PWM duty (0-255) |
+| PUMP_DUTY_VENT | 150 | Ventilation pump PWM duty |
+| PUMP_TIME_MEASURE | 25 | Sampling pump run time (seconds) |
+| PUMP_TIME_VENT | 50 | Ventilation pump run time (seconds) |
+| SENSOR_STABILIZE_TIME | 20 | Pressure stabilization wait time (seconds) |
+| INTERVAL_SECONDS | 600 | Measurement interval (fixed 10min, aligned)* |
 
-> *注: 修改 `INTERVAL_SECONDS` 需同步修改时间对齐逻辑，请参考源码中 `getNextAlignedEpoch()` 函数
+> *Note: Modifying `INTERVAL_SECONDS` requires also modifying the alignment logic. See `getNextAlignedEpoch()` function in source code.
 
-## 项目结构
+## Project Structure
 
 ```
 esp32-co2-drift-compensator/
-├── firmware/              # ESP32 固件
+├── firmware/              # ESP32 Firmware
 │   ├── src/
 │   │   ├── main.cpp
 │   │   └── config.h.example
 │   └── platformio.ini
-├── web/                   # Web 前端 + PHP 后端
-│   ├── index.html         # 数据可视化页面
-│   ├── get_data.php       # 数据查询接口
-│   ├── sensor_data.php    # 数据接收接口
+├── web/                   # Web Frontend + PHP Backend
+│   ├── index.html         # Data visualization page
+│   ├── get_data.php       # Data query API
+│   ├── sensor_data.php    # Data receiving API
 │   └── config.php.example
 ├── data/
-│   └── sample_data.sql    # 示例数据 (1月3-9日实测)
+│   └── sample_data.sql    # Sample data (Jan 3-9 test)
 ├── docs/
-│   ├── HARDWARE.md        # 硬件接线说明
+│   ├── HARDWARE.md        # Hardware wiring guide
 │   └── images/
 └── README.md
 ```
 
-## 应用场景
+## Use Cases
 
-本项目最初用于密闭空间藻类呼吸作用监测，但漂移补偿算法适用于任何存在以下问题的场景：
+This project was originally developed for monitoring algae respiration in sealed chambers, but the drift compensation algorithm is applicable to any scenario with:
 
-- 气路装置密封不良
-- 需要长时间连续监测 CO2
-- 传感器存在长期漂移
+- Poor gas circuit sealing
+- Long-term continuous CO2 monitoring needs
+- Sensor long-term drift issues
 
-## 技术栈
+## Tech Stack
 
-- 固件: PlatformIO + Arduino Framework
-- 传感器: ZG09SR (Modbus RTU)
-- 前端: ECharts + 原生 JS
-- 后端: PHP + MySQL
-- 硬件: ESP32-S3 + 气泵 PWM 控制
+- Firmware: PlatformIO + Arduino Framework
+- Sensor: ZG09SR (Modbus RTU)
+- Frontend: ECharts + Vanilla JS
+- Backend: PHP + MySQL
+- Hardware: ESP32-S3 + PWM Pump Control
 
 ## License
 
-MIT License - 详见 [LICENSE](LICENSE)
+MIT License - See [LICENSE](LICENSE)
